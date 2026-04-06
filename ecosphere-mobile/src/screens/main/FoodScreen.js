@@ -15,6 +15,8 @@ import Animated, {
   FadeIn
 } from 'react-native-reanimated';
 
+import ApiConfig from '../../config/ApiConfig';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CONTENT_WIDTH = Platform.OS === 'web' ? Math.min(SCREEN_WIDTH, 450) : SCREEN_WIDTH;
 
@@ -74,7 +76,7 @@ export default function FoodScreen() {
     setShowAdvice(false);
     
     try {
-      const response = await fetch('http://localhost:8000/api/food/curate', {
+      const response = await fetch(ApiConfig.ENDPOINTS.SCAN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ persons, days, dishType, ingredients: selectedIngredients.join(", ") })

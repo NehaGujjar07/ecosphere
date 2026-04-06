@@ -11,6 +11,8 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 
+import ApiConfig from '../../config/ApiConfig';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTENT_WIDTH = Platform.OS === 'web' ? Math.min(SCREEN_WIDTH, 450) : SCREEN_WIDTH;
 
@@ -71,7 +73,7 @@ export default function CheckoutScreen({ navigation }) {
     setShowHealthCheck(false);
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/game/purchase', {
+      const res = await fetch(ApiConfig.ENDPOINTS.PURCHASE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
