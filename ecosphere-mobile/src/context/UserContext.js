@@ -35,7 +35,22 @@ export const UserProvider = ({ children }) => {
   const [ecoPoints, setEcoPoints] = useState(0);
   const [level, setLevel] = useState(null);
   const [badges, setBadges] = useState([]);
+  const [allBadges, setAllBadges] = useState([]);
+  const [co2Saved, setCo2Saved] = useState(0);
+  const [wasteAvoided, setWasteAvoided] = useState(0);
   const [cart, setCart] = useState([]);
+  
+  const AVAILABLE_VOUCHERS = [
+    { id: 1, title: '15% Off Organic Groceries', code: 'ECOFRUIT15', brand: 'FreshEarth', color: '#10B981', type: 'percent', discount: 15 },
+    { id: 2, title: '₹200 Off Bamboo Home Decor', code: 'BAMBOO200', brand: 'EcoHome', color: '#3B82F6', type: 'flat', discount: 200 },
+  ];
+  const [claimedVouchers, setClaimedVouchers] = useState([]);
+
+  const claimVoucher = (code) => {
+    if (!claimedVouchers.includes(code)) {
+      setClaimedVouchers(prev => [...prev, code]);
+    }
+  };
 
   // On app load, restore persisted session
   useEffect(() => {
@@ -58,6 +73,8 @@ export const UserProvider = ({ children }) => {
   const logoutUser = () => {
     setUser(null);
     setEcoPoints(0);
+    setCo2Saved(0);
+    setWasteAvoided(0);
     setLevel(null);
     setBadges([]);
     setCart([]);
@@ -81,13 +98,20 @@ export const UserProvider = ({ children }) => {
       setEcoPoints(data.total_points);
       setLevel(data.level);
       setBadges(data.badges);
+      if (data.all_badges) {
+        setAllBadges(data.all_badges);
+      }
+      if (data.savings) {
+        setCo2Saved(data.savings.co2_saved);
+        setWasteAvoided(data.savings.waste_avoided);
+      }
     } catch (e) {
       console.warn('Could not sync profile:', e);
     }
   };
 
   // Cart helpers
-  const addToCart = (product, quantity) => {
+  const addToCart = (product, quantity = 1) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
@@ -99,13 +123,32 @@ export const UserProvider = ({ children }) => {
     });
   };
 
+  const updateCartQuantity = (productId, delta) => {
+    setCart(prev => {
+      return prev.map(item => {
+        if (item.id === productId) {
+          const newQty = item.quantity + delta;
+          if (newQty <= 0) return null; // filter out later
+          return { ...item, quantity: newQty };
+        }
+        return item;
+      }).filter(Boolean);
+    });
+  };
+
+  const removeFromCart = (productId) => {
+    setCart(prev => prev.filter(item => item.id !== productId));
+  };
+
   const clearCart = () => setCart([]);
 
   return (
     <UserContext.Provider value={{
       user, loginUser, logoutUser,
-      ecoPoints, level, badges, syncProfile,
-      cart, addToCart, clearCart,
+      ecoPoints, level, badges, allBadges, syncProfile,
+      co2Saved, wasteAvoided,
+      cart, addToCart, updateCartQuantity, removeFromCart, clearCart,
+      AVAILABLE_VOUCHERS, claimedVouchers, claimVoucher,
     }}>
       {children}
     </UserContext.Provider>

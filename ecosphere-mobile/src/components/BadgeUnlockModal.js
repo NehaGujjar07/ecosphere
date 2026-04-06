@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, Modal, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, Modal, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOW } from '../theme/Theme';
 import { Ionicons } from '@expo/vector-icons';
 import PrimaryButton from './PrimaryButton';
@@ -53,7 +53,9 @@ const styles = StyleSheet.create({
   },
   content: {
     backgroundColor: '#FFF',
-    width: width * 0.85,
+    // Mobile width logic
+    width: Platform.OS === 'web' ? Math.min(Dimensions.get('window').width * 0.85, 380) : Dimensions.get('window').width * 0.85,
+    maxWidth: 400,
     borderRadius: RADIUS.xl,
     padding: SPACING.xl,
     alignItems: 'center',

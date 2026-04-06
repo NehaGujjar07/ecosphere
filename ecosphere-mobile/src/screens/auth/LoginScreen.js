@@ -39,8 +39,16 @@ export default function LoginScreen({ navigation }) {
       if (!res.ok) {
         Alert.alert('Error', data.detail || 'Something went wrong.');
       } else {
-        loginUser(data.user);
-        navigation.replace('MainApp');
+        if (isRegister) {
+          Alert.alert(
+            'Success!',
+            'Your account has been created. Please sign in with your credentials.',
+            [{ text: 'OK', onPress: () => setIsRegister(false) }]
+          );
+          setPassword(''); // Clear password for security
+        } else {
+          loginUser(data.user);
+        }
       }
     } catch (e) {
       Alert.alert('Connection Error', 'Could not reach the server. Make sure the backend is running.');

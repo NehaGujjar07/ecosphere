@@ -9,6 +9,8 @@ POINTS_PER_PURCHASE = 5  # 5 points per item purchased
 class PurchaseRequest(BaseModel):
     user_id: int
     items_count: int  # total number of items in the cart
+    co2_saved: float = 0
+    waste_avoided: float = 0
 
 @router.post("/purchase")
 def record_purchase(req: PurchaseRequest):
@@ -21,8 +23,8 @@ def record_purchase(req: PurchaseRequest):
     conn = database.get_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO purchases (user_id, items_count, points_awarded) VALUES (?, ?, ?)",
-        (req.user_id, req.items_count, points)
+        "INSERT INTO purchases (user_id, items_count, points_awarded, co2_saved, waste_avoided) VALUES (?, ?, ?, ?, ?)",
+        (req.user_id, req.items_count, points, req.co2_saved, req.waste_avoided)
     )
     conn.commit()
     conn.close()
@@ -31,6 +33,7 @@ def record_purchase(req: PurchaseRequest):
     total_points = database.get_user_points(req.user_id)
     level_info = database.get_level_info(total_points)
     badges = database.get_earned_badges(total_points)
+    savings = database.get_user_savings(req.user_id)
 
     return {
         "success": True,
@@ -38,6 +41,7 @@ def record_purchase(req: PurchaseRequest):
         "total_points": total_points,
         "level": level_info,
         "badges": badges,
+        "savings": savings,
         "new_badges": [b for b in badges if total_points - points < b["points_required"] <= total_points]
     }
 
@@ -56,6 +60,7 @@ def get_profile(user_id: int):
     total_points = database.get_user_points(user_id)
     level_info = database.get_level_info(total_points)
     badges = database.get_earned_badges(total_points)
+    savings = database.get_user_savings(user_id)
 
     return {
         "user_id": user_id,
@@ -64,5 +69,6 @@ def get_profile(user_id: int):
         "total_points": total_points,
         "level": level_info,
         "badges": badges,
+        "savings": savings,
         "all_badges": database.BADGES,  # For showing locked/unlocked badges on dashboard
     }

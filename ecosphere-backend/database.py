@@ -4,17 +4,17 @@ import os
 DB_PATH = os.path.join(os.path.dirname(__file__), "ecosphere.db")
 
 BADGES = [
-    {"id": "eco_starter",   "name": "Eco Starter",    "icon": "🌱", "points_required": 20,  "description": "Earned 20 EcoPoints from purchases"},
-    {"id": "green_shopper", "name": "Green Shopper",  "icon": "🛒", "points_required": 40,  "description": "Earned 40 EcoPoints from purchases"},
-    {"id": "eco_champion",  "name": "Eco Champion",   "icon": "🏆", "points_required": 100, "description": "Earned 100 EcoPoints from purchases"},
+    {"id": "eco_warrior",        "name": "Eco Warrior",        "icon": "🛡️", "points_required": 40, "description": "Earned 40 EcoPoints from sustainable shopping"},
+    {"id": "sustainability_pro", "name": "Sustainability Pro", "icon": "🌟", "points_required": 80, "description": "Earned 80 EcoPoints from sustainable shopping"},
+    {"id": "planet_hero",        "name": "Planet Hero",        "icon": "💎", "points_required": 120, "description": "Earned 120 EcoPoints from sustainable shopping"},
 ]
 
 LEVELS = [
-    {"level": 1, "title": "🌱 Green Beginner",       "min": 0},
-    {"level": 2, "title": "🌿 Eco Curious",          "min": 30},
-    {"level": 3, "title": "🌳 Sustainability Seeker","min": 70},
-    {"level": 4, "title": "🌍 Planet Protector",     "min": 120},
-    {"level": 5, "title": "⭐ Eco Champion",          "min": 200},
+    {"level": 1, "title": "🌱 Eco Starter",          "min": 0},
+    {"level": 2, "title": "🛡️ Eco Warrior",          "min": 40},
+    {"level": 3, "title": "🌟 Sustainability Pro",   "min": 80},
+    {"level": 4, "title": "💎 Planet Hero",          "min": 120},
+    {"level": 5, "title": "🏆 Eco Champion",         "min": 200},
 ]
 
 def get_connection():
@@ -42,10 +42,20 @@ def init_db():
             user_id INTEGER NOT NULL,
             items_count INTEGER NOT NULL,
             points_awarded INTEGER NOT NULL,
+            co2_saved REAL DEFAULT 0,
+            waste_avoided REAL DEFAULT 0,
             purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+
+    # ALTER statements to add columns to existing table if they don't exist
+    try:
+        cur.execute("ALTER TABLE purchases ADD COLUMN co2_saved REAL DEFAULT 0")
+    except sqlite3.OperationalError: pass
+    try:
+        cur.execute("ALTER TABLE purchases ADD COLUMN waste_avoided REAL DEFAULT 0")
+    except sqlite3.OperationalError: pass
 
     conn.commit()
     conn.close()
@@ -85,3 +95,20 @@ def get_level_info(points: int) -> dict:
 
 def get_earned_badges(points: int) -> list:
     return [b for b in BADGES if points >= b["points_required"]]
+
+def get_user_savings(user_id: int) -> dict:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT 
+            COALESCE(SUM(co2_saved), 0) as total_co2, 
+            COALESCE(SUM(waste_avoided), 0) as total_waste 
+        FROM purchases 
+        WHERE user_id = ?
+    """, (user_id,))
+    row = cur.fetchone()
+    conn.close()
+    return {
+        "co2_saved": round(row["total_co2"], 2),
+        "waste_avoided": round(row["total_waste"], 2)
+    }

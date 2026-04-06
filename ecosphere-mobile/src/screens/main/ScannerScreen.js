@@ -168,7 +168,7 @@ export default function ScannerScreen() {
             <View style={styles.loadingCard}>
               <ActivityIndicator size="large" color={COLORS.primary} />
               <Text style={styles.loadingTitle}>Analyzing Product</Text>
-              <Text style={styles.loadingText}>Gemini AI is evaluating sustainability impact...</Text>
+              <Text style={styles.loadingText}>Eco-AI is analyzing sustainability impact...</Text>
             </View>
           </View>
         )}
