@@ -3,7 +3,7 @@
 // For physical devices on the same WiFi: http://YOUR_COMPUTER_IP:8000
 // For production: https://your-app.onrender.com
 
-const API_BASE_URL = 'http://localhost:8000'; 
+const API_BASE_URL = 'https://ecosphere-api.onrender.com'; 
 
 export default {
     BASE_URL: API_BASE_URL,
