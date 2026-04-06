@@ -1,0 +1,65 @@
+/* src/theme/theme.css */
+/* Emerald & Slate palette with glassmorphism and micro‑animations */
+:root {
+  --color-primary: hsl(160, 70%, 40%); /* emerald */
+  --color-secondary: hsl(210, 10%, 20%); /* slate */
+  --color-bg: hsl(210, 10%, 12%);
+  --color-surface: hsla(210, 10%, 20%, 0.6);
+  --color-text: #e5e7eb; /* cool gray */
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+/* Glassmorphism card */
+.glass-card {
+  background: var(--color-surface);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.glass-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+
+/* Button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+.btn-primary:hover { background: hsl(160, 70%, 35%); }
+.btn-secondary {
+  background: var(--color-secondary);
+  color: #fff;
+}
+.btn-secondary:hover { background: hsl(210, 10%, 15%); }
+.btn-warning {
+  background: #fbbf24; /* amber */
+  color: #111;
+}
+.btn-warning:hover { background: #f59e0b; }
+
+/* Fade‑in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in { animation: fadeIn 0.4s ease forwards; }
