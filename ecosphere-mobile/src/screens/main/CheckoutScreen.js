@@ -9,10 +9,6 @@ import Animated, {
   FadeInDown, 
   FadeInRight, 
   FadeInUp,
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -26,11 +22,14 @@ export default function CheckoutScreen({ navigation }) {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [orderPoints, setOrderPoints] = useState(0);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [activeVoucherMessage, setActiveVoucherMessage] = useState('');
   
   const [paymentMethod, setPaymentMethod] = useState('cod'); 
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState(0);
+
+  const lowRatingItems = cart.filter(item => parseFloat(item.eco_rating) < 4.0);
 
   const totalAmount = cart.reduce((acc, item) => {
     const rawPrice = parseInt(item.price.replace(/[^0-9]/g, ''), 10);
@@ -38,7 +37,6 @@ export default function CheckoutScreen({ navigation }) {
   }, 0);
 
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const pointsToEarn = totalItems * 5;
   const totalCO2Saved = cart.reduce((acc, item) => acc + (item.co2_saved * item.quantity), 0);
   const totalWasteAvoided = cart.reduce((acc, item) => acc + (item.waste_avoided * item.quantity), 0);
 
@@ -60,8 +58,17 @@ export default function CheckoutScreen({ navigation }) {
 
   const finalAmount = Math.max(0, totalAmount - appliedDiscount);
 
-  const handleCheckout = async () => {
+  const startCheckout = () => {
+    if (lowRatingItems.length > 0) {
+      setShowHealthCheck(true);
+    } else {
+      processOrder();
+    }
+  };
+
+  const processOrder = async () => {
     if (!user?.id) return;
+    setShowHealthCheck(false);
     setLoading(true);
     try {
       const res = await fetch('http://localhost:8000/api/game/purchase', {
@@ -96,6 +103,40 @@ export default function CheckoutScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* ECO HEALTH CHECK MODAL */}
+      <Modal visible={showHealthCheck} transparent animationType="fade">
+         <View style={styles.modalOverlay}>
+            <Animated.View entering={FadeInUp} style={styles.healthCheckCard}>
+               <View style={styles.healthHeader}>
+                  <Ionicons name="alert-circle" size={40} color="#DC2626" />
+                  <Text style={styles.healthHeaderText}>ECO-HEALTH CHECK</Text>
+               </View>
+               <View style={styles.healthBody}>
+                  <Text style={styles.healthTitle}>High Impact Items Detected!</Text>
+                  <Text style={styles.healthDesc}>
+                     Your cart contains {lowRatingItems.length} items with low sustainability scores. These items may negatively impact your planet savings record.
+                  </Text>
+                  {lowRatingItems.map((item, i) => (
+                    <View key={i} style={styles.warningItem}>
+                       <Text style={styles.warningItemName}>• {item.name}</Text>
+                       <Text style={styles.warningItemScore}>{item.eco_rating}</Text>
+                    </View>
+                  ))}
+                  <View style={styles.healthActions}>
+                     <PrimaryButton 
+                        title="EDIT CART" 
+                        onPress={() => setShowHealthCheck(false)} 
+                        style={styles.fullBtn}
+                     />
+                     <TouchableOpacity style={styles.healthProceed} onPress={processOrder}>
+                        <Text style={styles.healthProceedText}>PROCEED ANYWAY</Text>
+                     </TouchableOpacity>
+                  </View>
+               </View>
+            </Animated.View>
+         </View>
+      </Modal>
+
       {/* SUCCESS MODALS */}
       <Modal visible={showOrderModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -227,8 +268,13 @@ export default function CheckoutScreen({ navigation }) {
               </View>
 
               <View style={styles.impactRecap}>
-                <Ionicons name="planet" size={20} color={COLORS.primary} />
-                <Text style={styles.impactText}>This order saves {totalCO2Saved.toFixed(1)}kg of CO₂</Text>
+                <Ionicons name={totalCO2Saved < 0 ? "alert-circle" : "planet"} size={20} color={totalCO2Saved < 0 ? "#DC2626" : COLORS.primary} />
+                <Text style={[styles.impactText, totalCO2Saved < 0 && { color: '#DC2626' }]}>
+                   {totalCO2Saved < 0 
+                     ? `Critical: This order has negative environmental impact!` 
+                     : `This order saves ${totalCO2Saved.toFixed(1)}kg of CO₂`
+                   }
+                </Text>
               </View>
             </Animated.View>
           </>
@@ -239,7 +285,7 @@ export default function CheckoutScreen({ navigation }) {
         <Animated.View entering={FadeInUp.delay(800)} style={styles.footer}>
           <PrimaryButton
             title={loading ? 'PROCESSING...' : `PLACE ORDER • ₹${Math.round(finalAmount).toLocaleString()}`}
-            onPress={handleCheckout}
+            onPress={startCheckout}
           />
         </Animated.View>
       )}
@@ -310,4 +356,18 @@ const styles = StyleSheet.create({
   voucherModalContent: { backgroundColor: '#FFF', padding: SPACING.xl, borderRadius: RADIUS.xl, alignItems: 'center', width: '85%', maxWidth: 380, ...SHADOW.float },
   voucherModalTitle: { ...TYPOGRAPHY.h2, color: COLORS.primary, marginBottom: 8 },
   voucherModalBody: { ...TYPOGRAPHY.body, color: COLORS.slateMuted, textAlign: 'center' },
+
+  healthCheckCard: { backgroundColor: '#FFF', width: '85%', maxWidth: 380, borderRadius: RADIUS.xl, overflow: 'hidden', ...SHADOW.float },
+  healthHeader: { backgroundColor: '#DC2626', padding: 24, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  healthHeaderText: { fontSize: 14, fontWeight: '900', color: '#FFF', marginLeft: 12, letterSpacing: 1 },
+  healthBody: { padding: 24 },
+  healthTitle: { ...TYPOGRAPHY.h3, color: COLORS.slate, textAlign: 'center', marginBottom: 12 },
+  healthDesc: { fontSize: 13, color: COLORS.slateMuted, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  warningItem: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#FEF2F2', padding: 10, borderRadius: 8, marginBottom: 6 },
+  warningItemName: { fontSize: 12, fontWeight: '700', color: '#991B1B' },
+  warningItemScore: { fontSize: 12, fontWeight: '800', color: '#DC2626' },
+  healthActions: { alignItems: 'center', marginTop: 24, width: '100%' },
+  fullBtn: { width: '100%', marginBottom: 12 },
+  healthProceed: { paddingVertical: 12, paddingHorizontal: 24 },
+  healthProceedText: { fontSize: 13, fontWeight: '800', color: COLORS.slateMuted, textDecorationLine: 'underline', letterSpacing: 0.5 },
 });

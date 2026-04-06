@@ -3,13 +3,12 @@ import { StyleSheet, Text, View, ScrollView, Platform, Image, TouchableOpacity, 
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOW } from '../../theme/Theme';
 import { Ionicons } from '@expo/vector-icons';
 import { UserContext } from '../../context/UserContext';
+import EcoInsightModal from '../../components/EcoInsightModal';
 import Animated, { 
   FadeInDown, 
   FadeIn, 
   FadeOut, 
   LinearTransition,
-  Layout,
-  SlideInRight
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -23,14 +22,29 @@ const PRODUCTS = [
     material: "Sustainable Moso Bamboo", co2_saved: 0.8, waste_avoided: 0.15, eco_rating: "5/5"
   },
   { 
+    id: 21, name: "Plastic Water Bottle 6pk", brand: "Aqualux", price: "₹120", points: 2, 
+    image: require('../../../assets/products/prod_21.png'), category: "Home", tag: "Warning",
+    material: "PET Plastic", co2_saved: -0.5, waste_avoided: -2.0, eco_rating: "1.2/5"
+  },
+  { 
     id: 2, name: "Recycled Cotton Tote", brand: "ThreadGreen", price: "₹850", points: 100, 
     image: require('../../../assets/products/prod_2.png'), category: "Apparel", tag: "Ethical Fashion",
     material: "100% Recycled Cotton", co2_saved: 2.1, waste_avoided: 0.5, eco_rating: "4.8/5"
   },
   { 
+    id: 22, name: "Chlorine Bleach Cleaner", brand: "C-Shine", price: "₹280", points: 5, 
+    image: require('../../../assets/products/prod_22.png'), category: "Home", tag: "Warning",
+    material: "Chemical Bleach", co2_saved: -0.2, waste_avoided: -0.5, eco_rating: "1.8/5"
+  },
+  { 
     id: 3, name: "Reusable Coffee Cup", brand: "Oasis", price: "₹1,200", points: 150, 
     image: require('../../../assets/products/prod_3.png'), category: "Home", tag: "Plastic Free",
     material: "BPA-Free Glass & Silicone", co2_saved: 3.5, waste_avoided: 1.2, eco_rating: "5/5"
+  },
+  { 
+    id: 23, name: "Disposable Plastic Spoons", brand: "FastDine", price: "₹85", points: 0, 
+    image: require('../../../assets/products/prod_23.png'), category: "Home", tag: "Warning",
+    material: "Single-use Plastic", co2_saved: -1.2, waste_avoided: -1.5, eco_rating: "0.5/5"
   },
   { 
     id: 4, name: "Organic Shampoo Bar", brand: "PureLather", price: "₹350", points: 40, 
@@ -123,11 +137,28 @@ export default function MarketScreen({ navigation }) {
   const { ecoPoints, cart, addToCart, updateCartQuantity } = useContext(UserContext);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedStory, setSelectedStory] = useState(null); 
+  const [pendingProduct, setPendingProduct] = useState(null); // For Eco-Alert
   
   const FILTER_TABS = ['All', 'Apparel', 'Home', 'Personal Care'];
   const getCartItem = (id) => cart.find(item => item.id === id);
   const totalCartItems = cart.reduce((acc, item) => acc + item.quantity, 0);
   const filteredProducts = PRODUCTS.filter(p => selectedCategory === 'All' || p.category === selectedCategory);
+
+  const handleAddToCart = (product) => {
+    const ratingValue = parseFloat(product.eco_rating);
+    if (ratingValue < 4.0) {
+      setPendingProduct(product);
+    } else {
+      addToCart(product, 1);
+    }
+  };
+
+  const confirmAddPending = () => {
+    if (pendingProduct) {
+      addToCart(pendingProduct, 1);
+      setPendingProduct(null);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -183,6 +214,7 @@ export default function MarketScreen({ navigation }) {
         <View style={styles.productGrid}>
           {filteredProducts.map((prod, index) => {
             const qty = getCartItem(prod.id)?.quantity || 0;
+            const isWarning = parseFloat(prod.eco_rating) < 4.0;
             return (
               <Animated.View 
                 key={prod.id} 
@@ -193,22 +225,24 @@ export default function MarketScreen({ navigation }) {
                 <TouchableOpacity 
                   activeOpacity={0.9} 
                   onLongPress={() => setSelectedStory(prod)}
-                  style={styles.card}
+                  style={[styles.card, isWarning && styles.warningCard]}
                 >
                   <View style={styles.imageBox}>
                     <Image source={prod.image} style={styles.img} />
-                    <View style={styles.tag}><Text style={styles.tagText}>{prod.tag}</Text></View>
+                    <View style={[styles.tag, isWarning && styles.warningTag]}>
+                      <Text style={styles.tagText}>{prod.tag}</Text>
+                    </View>
                   </View>
                   
                   <View style={styles.info}>
-                    <Text style={styles.brand}>{prod.brand}</Text>
+                    <Text style={[styles.brand, isWarning && { color: '#DC2626' }]}>{prod.brand}</Text>
                     <Text style={styles.name} numberOfLines={1}>{prod.name}</Text>
                     
                     <View style={styles.priceRow}>
                       <Text style={styles.price}>{prod.price}</Text>
-                      <View style={styles.saveBadge}>
-                        <Ionicons name="leaf" size={10} color={COLORS.primary} />
-                        <Text style={styles.saveText}>+{prod.points}</Text>
+                      <View style={[styles.saveBadge, isWarning && { backgroundColor: '#FEF2F2' }]}>
+                        <Ionicons name="leaf" size={10} color={isWarning ? '#DC2626' : COLORS.primary} />
+                        <Text style={[styles.saveText, isWarning && { color: '#DC2626' }]}>+{prod.points}</Text>
                       </View>
                     </View>
 
@@ -224,7 +258,10 @@ export default function MarketScreen({ navigation }) {
                            </TouchableOpacity>
                         </Animated.View>
                       ) : (
-                        <TouchableOpacity style={styles.addBtn} onPress={() => addToCart(prod, 1)}>
+                        <TouchableOpacity 
+                          style={[styles.addBtn, isWarning && { backgroundColor: '#64748B' }]} 
+                          onPress={() => handleAddToCart(prod)}
+                        >
                            <Ionicons name="add" size={18} color="#FFF" />
                            <Text style={styles.addBtnText}>ADD</Text>
                         </TouchableOpacity>
@@ -238,7 +275,16 @@ export default function MarketScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      {/* STORY MODAL (LONG-PRESS) */}
+      {/* ECO-ALERT MODAL */}
+      <EcoInsightModal 
+        visible={!!pendingProduct}
+        product={pendingProduct}
+        onClose={() => setPendingProduct(null)}
+        onConfirm={confirmAddPending}
+        type="warning"
+      />
+
+      {/* STORY MODAL */}
       <Modal visible={!!selectedStory} transparent animationType="fade">
         <View style={styles.modalOverlay}>
            <Animated.View entering={FadeInDown.duration(400)} style={styles.storyCard}>
@@ -257,12 +303,12 @@ export default function MarketScreen({ navigation }) {
                    <View style={styles.impactItem}>
                       <Ionicons name="cloud-outline" size={20} color="#0284C7" />
                       <Text style={styles.impactVal}>{selectedStory?.co2_saved}kg</Text>
-                      <Text style={styles.impactLab}>CO₂ SAVED</Text>
+                      <Text style={styles.impactLab}>CO₂ IMPACT</Text>
                    </View>
                    <View style={styles.impactItem}>
                       <Ionicons name="trash-outline" size={20} color="#D97706" />
                       <Text style={styles.impactVal}>{selectedStory?.waste_avoided}kg</Text>
-                      <Text style={styles.impactLab}>WASTE SAVED</Text>
+                      <Text style={styles.impactLab}>WASTE IMPACT</Text>
                    </View>
                    <View style={styles.impactItem}>
                       <Ionicons name="sparkles-outline" size={20} color="#059669" />
@@ -275,7 +321,7 @@ export default function MarketScreen({ navigation }) {
                    style={styles.storyGotIt} 
                    onPress={() => setSelectedStory(null)}
                 >
-                   <Text style={styles.storyGotItText}>AWESOME CHOICE</Text>
+                   <Text style={styles.storyGotItText}>GOT IT</Text>
                 </TouchableOpacity>
               </View>
            </Animated.View>
@@ -430,6 +476,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F8FAFC',
   },
+  warningCard: {
+    borderColor: '#FEE2E2',
+    backgroundColor: '#FFF9F9',
+  },
   imageBox: {
     height: CARD_WIDTH * 0.9,
     width: '100%',
@@ -447,6 +497,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+  },
+  warningTag: {
+    backgroundColor: '#DC2626',
   },
   tagText: {
     fontSize: 9,
@@ -532,7 +585,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.slate,
   },
-  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.85)',

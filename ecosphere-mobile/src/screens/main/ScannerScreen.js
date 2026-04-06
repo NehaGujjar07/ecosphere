@@ -8,6 +8,7 @@ import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOW } from '../../theme/Theme';
 import InputField from '../../components/InputField';
 import PrimaryButton from '../../components/PrimaryButton';
 import { Ionicons } from '@expo/vector-icons';
+import EcoInsightModal from '../../components/EcoInsightModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,6 +19,7 @@ export default function ScannerScreen() {
   const [cameraActive, setCameraActive] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  const [showAlert, setShowAlert] = useState(false);
 
   const openCamera = async () => {
     if (!permission?.granted) {
@@ -40,7 +42,6 @@ export default function ScannerScreen() {
     setScanned(true);
     setCameraActive(false);
     setProductSearch(data);
-    // Trigger analysis automatically after scan
     analyzeProduct(data);
   };
 
@@ -57,6 +58,11 @@ export default function ScannerScreen() {
       });
       const data = await response.json();
       setResult(data);
+      
+      // TRIGGER ALERT IF SCORE IS LOW
+      if (data.score && data.score < 4.0) {
+        setShowAlert(true);
+      }
     } catch (error) {
       console.error(error);
       setResult({ error: "Failed to connect to the EcoSphere AI server." });
@@ -69,6 +75,7 @@ export default function ScannerScreen() {
     setProductSearch('');
     setScanned(false);
     setCameraActive(false);
+    setShowAlert(false);
   };
 
   // CAMERA VIEW
@@ -81,7 +88,6 @@ export default function ScannerScreen() {
           barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr', 'code128', 'code39'] }}
           onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
         >
-          {/* Header */}
           <View style={styles.cameraHeader}>
             <TouchableOpacity onPress={() => setCameraActive(false)} style={styles.closeBtn}>
               <Ionicons name="close" size={28} color="#FFF" />
@@ -90,18 +96,15 @@ export default function ScannerScreen() {
             <View style={{ width: 44 }} />
           </View>
 
-          {/* Aim overlay */}
           <View style={styles.overlay}>
             <View style={styles.overlayTop} />
             <View style={styles.overlayMiddle}>
               <View style={styles.overlaySide} />
               <View style={styles.scanFrame}>
-                {/* Corners */}
                 <View style={[styles.corner, styles.cornerTL]} />
                 <View style={[styles.corner, styles.cornerTR]} />
                 <View style={[styles.corner, styles.cornerBL]} />
                 <View style={[styles.corner, styles.cornerBR]} />
-                {/* Scan line */}
                 <View style={styles.scanLine} />
               </View>
               <View style={styles.overlaySide} />
@@ -128,7 +131,6 @@ export default function ScannerScreen() {
 
         {!result && !loading && (
           <>
-            {/* Camera Trigger Button */}
             <TouchableOpacity style={styles.cameraButton} onPress={openCamera} activeOpacity={0.85}>
               <View style={styles.cameraIconRing}>
                 <Ionicons name="camera" size={42} color={COLORS.primary} />
@@ -137,11 +139,10 @@ export default function ScannerScreen() {
               <Text style={styles.cameraButtonSub}>Tap to open camera & scan a barcode</Text>
               <View style={styles.cameraButtonBadge}>
                 <Ionicons name="flash" size={12} color={COLORS.primary} />
-                <Text style={styles.cameraButtonBadgeText}>AI-Powered</Text>
+                <Text style={styles.cameraButtonBadgeText}>Eco-AI Powered</Text>
               </View>
             </TouchableOpacity>
 
-            {/* OR divider */}
             <View style={styles.dividerContainer}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>or enter manually</Text>
@@ -211,15 +212,6 @@ export default function ScannerScreen() {
                       ))}
                     </View>
                   )}
-
-                  {result.breakdown.suggestions?.length > 0 && (
-                    <View style={styles.suggestionBox}>
-                      <Text style={styles.suggestionTitle}>Smart Suggestion:</Text>
-                      {result.breakdown.suggestions.map((s, i) => (
-                        <Text key={i} style={styles.suggestionItem}>• {s}</Text>
-                      ))}
-                    </View>
-                  )}
                 </>
               )}
             </View>
@@ -238,6 +230,15 @@ export default function ScannerScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ALERT MODAL FOR LOW SCORE */}
+      <EcoInsightModal 
+        visible={showAlert}
+        onClose={() => setShowAlert(false)}
+        onConfirm={() => setShowAlert(false)}
+        product={{ name: result?.product_name, eco_rating: result?.score + '/10' }}
+        type="warning"
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -254,22 +255,9 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 100,
   },
-  header: {
-    marginBottom: SPACING.xl,
-    alignItems: 'center',
-  },
-  title: {
-    ...TYPOGRAPHY.h1,
-    color: COLORS.text,
-  },
-  subtitle: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textMuted,
-    marginTop: SPACING.xs,
-    textAlign: 'center',
-  },
-
-  // ── Camera trigger card ──────────────────────────────────────
+  header: { marginBottom: SPACING.xl, alignItems: 'center' },
+  title: { ...TYPOGRAPHY.h1, color: COLORS.text },
+  subtitle: { ...TYPOGRAPHY.body, color: COLORS.textMuted, marginTop: SPACING.xs, textAlign: 'center' },
   cameraButton: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.xl,
@@ -282,238 +270,58 @@ const styles = StyleSheet.create({
     ...SHADOW.medium,
   },
   cameraIconRing: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#E8F5E9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.m,
-    borderWidth: 3,
-    borderColor: COLORS.primaryLight,
+    width: 90, height: 90, borderRadius: 45, backgroundColor: '#E8F5E9',
+    alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.m,
+    borderWidth: 3, borderColor: COLORS.primaryLight,
   },
-  cameraButtonTitle: {
-    ...TYPOGRAPHY.h2,
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  cameraButtonSub: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
-  },
+  cameraButtonTitle: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: 4 },
+  cameraButtonSub: { ...TYPOGRAPHY.caption, color: COLORS.textMuted },
   cameraButtonBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.round,
-    marginTop: SPACING.m,
-    borderWidth: 1,
-    borderColor: COLORS.primaryLight,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.round,
+    marginTop: SPACING.m, borderWidth: 1, borderColor: COLORS.primaryLight,
   },
-  cameraButtonBadgeText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.primary,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-
-  // ── Divider ──────────────────────────────────────────────────
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.l,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.border,
-  },
-  dividerText: {
-    ...TYPOGRAPHY.caption,
-    color: COLORS.textMuted,
-    paddingHorizontal: SPACING.m,
-  },
-  scanButton: {
-    marginTop: SPACING.m,
-  },
-
-  // ── Loading ──────────────────────────────────────────────────
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: SPACING.xl,
-  },
-  loadingCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    alignItems: 'center',
-    width: '100%',
-    ...SHADOW.medium,
-  },
-  loadingTitle: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.text,
-    marginTop: SPACING.l,
-  },
-  loadingText: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textMuted,
-    marginTop: SPACING.s,
-    textAlign: 'center',
-  },
-
-  // ── Results ──────────────────────────────────────────────────
+  cameraButtonBadgeText: { ...TYPOGRAPHY.caption, color: COLORS.primary, fontWeight: 'bold', marginLeft: 4 },
+  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.l },
+  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
+  dividerText: { ...TYPOGRAPHY.caption, color: COLORS.textMuted, paddingHorizontal: SPACING.m },
+  scanButton: { marginTop: SPACING.m },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: SPACING.xl },
+  loadingCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS.xl, padding: SPACING.xl, alignItems: 'center', width: '100%', ...SHADOW.medium },
+  loadingTitle: { ...TYPOGRAPHY.h3, color: COLORS.text, marginTop: SPACING.l },
+  loadingText: { ...TYPOGRAPHY.body, color: COLORS.textMuted, marginTop: SPACING.s, textAlign: 'center' },
   resultContainer: { flex: 1 },
-  resultsHeader: {
-    ...TYPOGRAPHY.h2,
-    color: COLORS.text,
-    marginBottom: SPACING.m,
-    textAlign: 'center',
-  },
-  resultCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.l,
-    padding: SPACING.l,
-    ...SHADOW.large,
-  },
+  resultsHeader: { ...TYPOGRAPHY.h2, color: COLORS.text, marginBottom: SPACING.m, textAlign: 'center' },
+  resultCard: { backgroundColor: COLORS.surface, borderRadius: RADIUS.l, padding: SPACING.l, ...SHADOW.large },
   errorText: { color: '#DC2626', textAlign: 'center' },
-  scoreRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.l,
-  },
+  scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.l },
   productName: { ...TYPOGRAPHY.h3, color: COLORS.text },
   brandName: { ...TYPOGRAPHY.caption, color: COLORS.textMuted },
-  scoreCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  scoreCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   scoreText: { ...TYPOGRAPHY.h3, fontWeight: 'bold' },
-  insightBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.s,
-    backgroundColor: '#F3F4F6',
-    padding: SPACING.s,
-    borderRadius: RADIUS.s,
-  },
+  insightBox: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.s, backgroundColor: '#F3F4F6', padding: SPACING.s, borderRadius: RADIUS.s },
   insightText: { marginLeft: SPACING.s, ...TYPOGRAPHY.caption, color: COLORS.text },
-  riskBox: {
-    marginTop: SPACING.m,
-    backgroundColor: '#FEF2F2',
-    padding: SPACING.m,
-    borderRadius: RADIUS.s,
-    borderLeftWidth: 3,
-    borderLeftColor: '#EF4444',
-  },
+  riskBox: { marginTop: SPACING.m, backgroundColor: '#FEF2F2', padding: SPACING.m, borderRadius: RADIUS.s, borderLeftWidth: 3, borderLeftColor: '#EF4444' },
   riskTitle: { ...TYPOGRAPHY.caption, fontWeight: 'bold', color: '#991B1B', marginBottom: 4 },
   riskItem: { ...TYPOGRAPHY.small, color: '#991B1B' },
-  suggestionBox: {
-    marginTop: SPACING.m,
-    backgroundColor: '#ECFDF5',
-    padding: SPACING.m,
-    borderRadius: RADIUS.s,
-    borderLeftWidth: 3,
-    borderLeftColor: '#10B981',
-  },
-  suggestionTitle: { ...TYPOGRAPHY.caption, fontWeight: 'bold', color: '#065F46', marginBottom: 4 },
-  suggestionItem: { ...TYPOGRAPHY.small, color: '#065F46' },
-  resultActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.xl,
-    gap: SPACING.m,
-  },
-  secondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.l,
-    paddingVertical: 14,
-    borderRadius: RADIUS.round,
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    ...SHADOW.small,
-  },
-  secondaryBtnText: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.primary,
-    fontWeight: 'bold',
-    marginLeft: 6,
-  },
+  resultActions: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.xl, gap: SPACING.m },
+  secondaryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, paddingHorizontal: SPACING.l, paddingVertical: 14, borderRadius: RADIUS.round, borderWidth: 1.5, borderColor: COLORS.primary, ...SHADOW.small },
+  secondaryBtnText: { ...TYPOGRAPHY.body, color: COLORS.primary, fontWeight: 'bold', marginLeft: 6 },
   newProductBtn: { flex: 1 },
-
-  // ── Full-screen Camera ────────────────────────────────────────
   cameraScreen: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
-  cameraHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 56 : 40,
-    paddingHorizontal: SPACING.l,
-    paddingBottom: SPACING.m,
-  },
-  closeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cameraHeaderText: {
-    ...TYPOGRAPHY.h3,
-    color: '#FFF',
-    fontWeight: 'bold',
-  },
-
-  // ── Barcode aim overlay ───────────────────────────────────────
+  cameraHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: Platform.OS === 'ios' ? 56 : 40, paddingHorizontal: SPACING.l, paddingBottom: SPACING.m },
+  closeBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  cameraHeaderText: { ...TYPOGRAPHY.h3, color: '#FFF', fontWeight: 'bold' },
   overlay: { flex: 1 },
   overlayTop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   overlayMiddle: { flexDirection: 'row' },
   overlaySide: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  scanFrame: {
-    width: FRAME_SIZE,
-    height: FRAME_SIZE * 0.65,
-    position: 'relative',
-  },
-  overlayBottom: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    paddingTop: SPACING.xl,
-  },
-  scanHint: {
-    ...TYPOGRAPHY.body,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  scanLine: {
-    position: 'absolute',
-    top: '50%',
-    width: '100%',
-    height: 2,
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-  },
-  corner: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderColor: '#FFF',
-    borderWidth: 3,
-  },
+  scanFrame: { width: FRAME_SIZE, height: FRAME_SIZE * 0.65, position: 'relative' },
+  overlayBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', paddingTop: SPACING.xl },
+  scanHint: { ...TYPOGRAPHY.body, color: 'rgba(255,255,255,0.8)' },
+  scanLine: { position: 'absolute', top: '50%', width: '100%', height: 2, backgroundColor: COLORS.primary, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 8 },
+  corner: { position: 'absolute', width: 24, height: 24, borderColor: '#FFF', borderWidth: 3 },
   cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 6 },
   cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 6 },
   cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 6 },
