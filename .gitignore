@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+# Expo/Mobile
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Sensitive Info (CRITICAL)
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.jks
+
+# Databases
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
