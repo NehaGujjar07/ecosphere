@@ -38,6 +38,8 @@ export const UserProvider = ({ children }) => {
   const [allBadges, setAllBadges] = useState([]);
   const [co2Saved, setCo2Saved] = useState(0);
   const [wasteAvoided, setWasteAvoided] = useState(0);
+  const [history, setHistory] = useState([]);
+  const [trends, setTrends] = useState([]);
   const [cart, setCart] = useState([]);
   
   const AVAILABLE_VOUCHERS = [
@@ -105,6 +107,8 @@ export const UserProvider = ({ children }) => {
         setCo2Saved(data.savings.co2_saved);
         setWasteAvoided(data.savings.waste_avoided);
       }
+      setHistory(data.history || []);
+      setTrends(data.trends || []);
     } catch (e) {
       console.warn('Could not sync profile:', e);
     }
@@ -146,7 +150,7 @@ export const UserProvider = ({ children }) => {
     <UserContext.Provider value={{
       user, loginUser, logoutUser,
       ecoPoints, level, badges, allBadges, syncProfile,
-      co2Saved, wasteAvoided,
+      co2Saved, wasteAvoided, history, trends,
       cart, addToCart, updateCartQuantity, removeFromCart, clearCart,
       AVAILABLE_VOUCHERS, claimedVouchers, claimVoucher,
     }}>

@@ -1,5 +1,5 @@
-import React, { useContext, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, Platform, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, Platform, TouchableOpacity, Dimensions, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, TYPOGRAPHY, SPACING, RADIUS, SHADOW } from '../../theme/Theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,17 +11,100 @@ import Animated, {
   useAnimatedStyle, 
   withSpring, 
   withDelay,
-  withTiming
+  withTiming,
+  Layout
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTENT_WIDTH = Platform.OS === 'web' ? Math.min(SCREEN_WIDTH, 450) : SCREEN_WIDTH;
 
+// --- INTERNAL CHART COMPONENT ---
+const TrendChart = ({ data }) => {
+  if (!data || data.length === 0) return null;
+  const maxVal = Math.max(...data.map(d => d.co2 + d.waste), 5);
+  
+  return (
+    <View style={styles.chartContainer}>
+      <View style={styles.chartTitleRow}>
+        <Text style={styles.chartTitle}>IMPACT HISTORY (6m)</Text>
+        <View style={styles.legend}>
+           <View style={[styles.dot, { backgroundColor: '#0284C7' }]} /><Text style={styles.legendText}>CO2</Text>
+           <View style={[styles.dot, { backgroundColor: '#D97706' }]} /><Text style={styles.legendText}>Waste</Text>
+        </View>
+      </View>
+      <View style={styles.barsArea}>
+         {data.map((item, i) => (
+           <View key={i} style={styles.barColumn}>
+              <View style={styles.barStack}>
+                 <Animated.View 
+                    entering={FadeInDown.delay(i * 100).duration(800)}
+                    style={[styles.barPart, { backgroundColor: '#0284C7', height: `${(item.co2/maxVal)*100}%` }]} 
+                 />
+                 <Animated.View 
+                    entering={FadeInDown.delay(i * 100 + 50).duration(800)}
+                    style={[styles.barPart, { backgroundColor: '#D97706', height: `${(item.waste/maxVal)*100}%` }]} 
+                 />
+              </View>
+              <Text style={styles.barLabel}>{item.month}</Text>
+           </View>
+         ))}
+      </View>
+    </View>
+  );
+};
+
+// --- SCENARIO SIMULATOR COMPONENT ---
+const ScenarioSimulator = () => {
+  const [bottles, setBottles] = useState(5);
+  const [meatFree, setMeatFree] = useState(2);
+  
+  const simCO2 = (bottles * 0.5) + (meatFree * 2.5);
+  const simWaste = (bottles * 0.1);
+
+  return (
+    <View style={styles.simCard}>
+       <View style={styles.simHeader}>
+         <Ionicons name="flask" size={20} color={COLORS.primary} />
+         <Text style={styles.simTitle}>WHAT-IF SCENARIO</Text>
+       </View>
+       <Text style={styles.simDesc}>If I change my habits next month...</Text>
+       
+       <View style={styles.sliderRow}>
+          <Text style={styles.sliderLabel}>Skip Plastic Bottles: {bottles}</Text>
+          <View style={styles.sliderControls}>
+             <TouchableOpacity onPress={() => setBottles(Math.max(0, bottles-1))} style={styles.circleBtn}><Ionicons name="remove" size={16} color={COLORS.primary} /></TouchableOpacity>
+             <TouchableOpacity onPress={() => setBottles(bottles+1)} style={styles.circleBtn}><Ionicons name="add" size={16} color={COLORS.primary} /></TouchableOpacity>
+          </View>
+       </View>
+
+       <View style={styles.sliderRow}>
+          <Text style={styles.sliderLabel}>Meat-free Days: {meatFree}</Text>
+          <View style={styles.sliderControls}>
+             <TouchableOpacity onPress={() => setMeatFree(Math.max(0, meatFree-1))} style={styles.circleBtn}><Ionicons name="remove" size={16} color={COLORS.primary} /></TouchableOpacity>
+             <TouchableOpacity onPress={() => setMeatFree(meatFree+1)} style={styles.circleBtn}><Ionicons name="add" size={16} color={COLORS.primary} /></TouchableOpacity>
+          </View>
+       </View>
+
+       <View style={styles.simResult}>
+          <View style={styles.simResultItem}>
+             <Text style={styles.simResultValue}>{simCO2.toFixed(1)}kg</Text>
+             <Text style={styles.simResultLabel}>CO2 SAVED</Text>
+          </View>
+          <View style={styles.simResultDivider} />
+          <View style={styles.simResultItem}>
+             <Text style={styles.simResultValue}>{simWaste.toFixed(2)}kg</Text>
+             <Text style={styles.simResultLabel}>WASTE AVOIDED</Text>
+          </View>
+       </View>
+    </View>
+  );
+};
+
 export default function DashboardScreen({ navigation }) {
   const { 
     ecoPoints, level, badges, allBadges, syncProfile, user, logoutUser, 
     AVAILABLE_VOUCHERS, claimedVouchers, claimVoucher, 
-    co2Saved, wasteAvoided 
+    co2Saved, wasteAvoided, history, trends
   } = useContext(UserContext);
   const [showLogout, setShowLogout] = React.useState(false);
 
@@ -29,7 +112,6 @@ export default function DashboardScreen({ navigation }) {
     syncProfile();
   }, []);
 
-  // Animated progress bar
   const progress = useSharedValue(0);
   useEffect(() => {
     if (level?.progress_percent) {
@@ -59,16 +141,12 @@ export default function DashboardScreen({ navigation }) {
             style={styles.avatarContainer} 
             onPress={() => setShowLogout(!showLogout)}
           >
-            <LinearGradient
-              colors={[COLORS.primary, COLORS.primaryDark]}
-              style={styles.avatarGradient}
-            >
+            <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.avatarGradient}>
               <Ionicons name="person" size={22} color="#FFF" />
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Logout Popover */}
         {showLogout && (
           <Animated.View entering={FadeInDown.duration(200)} style={styles.dropdownContainer}>
             <TouchableOpacity style={styles.dropdownItem} onPress={logoutUser}>
@@ -78,447 +156,159 @@ export default function DashboardScreen({ navigation }) {
           </Animated.View>
         )}
 
-        {/* Main Score Card */}
+        {/* Global Impact Summary */}
         <Animated.View entering={FadeInDown.delay(200).duration(800)}>
-          <LinearGradient
-            colors={['#064E3B', '#059669']}
-            style={styles.pointsCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="leaf" size={140} color="rgba(255,255,255,0.08)" style={styles.bgIcon} />
-            <View style={styles.pointsHeader}>
-              <View>
-                <Text style={styles.pointsLabel}>ECO POINTS BALANCE</Text>
-                <Text style={styles.pointsValue}>{ecoPoints.toLocaleString()}</Text>
-              </View>
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelBadgeText}>LVL {level?.level || 1}</Text>
-              </View>
-            </View>
-
-            <View style={styles.levelContainer}>
-              <View style={styles.levelHeader}>
-                <Text style={styles.levelTitle}>{level?.title || 'Green Beginner'}</Text>
-                <Text style={styles.progressPercent}>{level?.progress_percent || 0}%</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                <Animated.View style={[styles.progressBarFill, progressBarInfo]} />
-              </View>
-               <Text style={styles.progressText}>
-                 {level?.pts_to_next_level > 0 
-                   ? `${level.pts_to_next_level} pts to unlock ${level.next_level_title}` 
-                   : '🏆 Maximum Level Reached'}
-               </Text>
-            </View>
+          <LinearGradient colors={['#064E3B', '#10B981']} style={styles.impactHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+             <View style={styles.heroRow}>
+                <View>
+                   <Text style={styles.heroLabel}>IMPACT POINTS</Text>
+                   <Text style={styles.heroPoints}>{ecoPoints.toLocaleString()}</Text>
+                </View>
+                <View style={styles.levelPill}>
+                   <Text style={styles.levelPillText}>LVL {level?.level || 1}</Text>
+                </View>
+             </View>
+             <View style={styles.progressSection}>
+                <View style={styles.progressBarBg}><Animated.View style={[styles.progressBarFill, progressBarInfo]} /></View>
+                <Text style={styles.heroSubText}>{level?.title || 'Eco Starter'}</Text>
+             </View>
           </LinearGradient>
         </Animated.View>
 
-        {/* Environmental Savings */}
+        {/* Analytics Section */}
         <Animated.View entering={FadeInDown.delay(400).duration(800)}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Planet Impact</Text>
-          </View>
-          <View style={styles.statsGrid}>
-            <View style={[styles.statBox, { borderBottomColor: '#0284C7', borderBottomWidth: 3 }]}>
-              <View style={[styles.iconWrapper, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="cloud-done" size={24} color="#0284C7" />
-              </View>
+            <View style={styles.sectionHeader}>
+               <Text style={styles.sectionTitle}>Analytics & Insights</Text>
+            </View>
+            <TrendChart data={trends} />
+            <ScenarioSimulator />
+        </Animated.View>
+
+        {/* Statistics Grid */}
+        <View style={styles.statsGrid}>
+           <View style={[styles.statBox, { borderLeftColor: '#0284C7', borderLeftWidth: 4 }]}>
+              <Text style={styles.statLabel}>CO2 SAVED</Text>
               <Text style={styles.statValue}>{co2Saved.toFixed(1)}kg</Text>
-              <Text style={styles.statLabel}>CO₂ OFFSET</Text>
-            </View>
-            
-            <View style={[styles.statBox, { borderBottomColor: '#D97706', borderBottomWidth: 3 }]}>
-              <View style={[styles.iconWrapper, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="trash" size={24} color="#D97706" />
-              </View>
-              <Text style={styles.statValue}>{wasteAvoided.toFixed(1)}kg</Text>
+           </View>
+           <View style={[styles.statBox, { borderLeftColor: '#D97706', borderLeftWidth: 4 }]}>
               <Text style={styles.statLabel}>WASTE SAVED</Text>
-            </View>
-          </View>
-        </Animated.View>
+              <Text style={styles.statValue}>{wasteAvoided.toFixed(1)}kg</Text>
+           </View>
+        </View>
 
-        {/* Rewards Section */}
+        {/* Sustainability Ledger */}
         <Animated.View entering={FadeInDown.delay(600).duration(800)}>
-          <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Eco Rewards</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Market')}><Text style={styles.seeAll}>VIEW SHOP</Text></TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vouchersScroll}>
-              {AVAILABLE_VOUCHERS.map((v, index) => {
-                  const isClaimed = claimedVouchers.includes(v.code);
-                  return (
-                    <Animated.View key={v.id} entering={FadeInRight.delay(700 + index * 100)}>
-                      <TouchableOpacity 
-                        style={[styles.voucherCard, isClaimed && styles.voucherClaimed]}
-                        onPress={() => claimVoucher(v.code)}
-                        disabled={isClaimed}
-                      >
-                          <View style={styles.voucherTop}>
-                            <Text style={[styles.voucherBrand, { color: v.color }]}>{v.brand}</Text>
-                            {isClaimed && <Ionicons name="checkmark-seal" size={20} color={v.color} />}
-                          </View>
-                          <Text style={styles.voucherTitle}>{v.title}</Text>
-                          <View style={[styles.codeBadge, { borderColor: v.color }]}>
-                              <Text style={[styles.codeText, { color: v.color }]}>{isClaimed ? 'REDEEMED' : v.code}</Text>
-                          </View>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  );
-              })}
-          </ScrollView>
-        </Animated.View>
-
-        {/* Badges */}
-        <Animated.View entering={FadeInDown.delay(800).duration(800)}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Milestones</Text>
-            <View style={styles.badgeCountBadge}>
-              <Text style={styles.badgeCountText}>{badges.length}/{allBadges.length || 3}</Text>
-            </View>
-          </View>
-          <View style={styles.badgesContainer}>
-            {((allBadges && allBadges.length > 0) ? allBadges : [
-              { id: 'eco_warrior',        name: 'Eco Warrior',        icon: '🛡️', points_required: 40 },
-              { id: 'sustainability_pro', name: 'Sustainability Pro', icon: '🌟', points_required: 80 },
-              { id: 'planet_hero',        name: 'Planet Hero',        icon: '💎', points_required: 120 },
-            ]).map((badge, index) => {
-              const unlocked = badges.some(b => b.id === badge.id);
-              return (
-                <View key={badge.id} style={styles.badgeWrapper}>
-                  <View style={[styles.badgeIconBox, !unlocked && styles.badgeLocked]}>
-                    <Text style={styles.badgeEmoji}>{badge.icon}</Text>
-                    {!unlocked && <View style={styles.lockOverlay}><Ionicons name="lock-closed" size={12} color="#FFF" /></View>}
+           <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Eco Ledger</Text>
+              <Text style={styles.seeAll}>RECENTS</Text>
+           </View>
+           <View style={styles.ledgerArea}>
+              {history && history.length > 0 ? (
+                history.map((item, idx) => (
+                  <View key={idx} style={styles.ledgerItem}>
+                     <View style={styles.ledgerDate}>
+                        <Text style={styles.dayText}>{item.date?.split('-')[2]?.split(' ')[0] || '06'}</Text>
+                        <Text style={styles.monthText}>APR</Text>
+                     </View>
+                     <View style={styles.ledgerInfo}>
+                        <Text style={styles.ledgerTitle}>{item.items_count} items purchased</Text>
+                        <Text style={styles.ledgerSub}>Impact: +{item.points_awarded} pts</Text>
+                     </View>
+                     <View style={styles.ledgerImpact}>
+                        <Text style={styles.impactText}>-{item.co2_saved.toFixed(1)}kg CO2</Text>
+                     </View>
                   </View>
-                  <Text style={[styles.badgeLabel, !unlocked && styles.textMuted]}>{badge.name}</Text>
-                  <Text style={styles.badgePointsReq}>{badge.points_required} pts</Text>
-                </View>
-              );
-            })}
-          </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>No transactions recorded yet.</Text>
+              )}
+           </View>
         </Animated.View>
 
+        {/* Vouchers and Rewards (Scrollable) */}
+        <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Rewards</Text></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vouchersScroll}>
+           {AVAILABLE_VOUCHERS.map(v => (
+             <TouchableOpacity key={v.id} style={styles.voucherCard} onPress={() => claimVoucher(v.code)}>
+                <Text style={[styles.voucherBrand, { color: v.color }]}>{v.brand}</Text>
+                <Text style={styles.voucherTitle}>{v.title}</Text>
+                <View style={styles.voucherFooter}><Text style={styles.voucherLabel}>USE CODE: {v.code}</Text></View>
+             </TouchableOpacity>
+           ))}
+        </ScrollView>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollView: {
-    flex: 1,
-    width: CONTENT_WIDTH,
-    alignSelf: 'center',
-  },
-  scrollContent: {
-    padding: SPACING.l,
-    paddingBottom: 120,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: Platform.OS === 'ios' ? 40 : 20,
-    marginBottom: SPACING.xl,
-  },
-  greeting: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.textMuted,
-    fontWeight: '500',
-  },
-  title: {
-    ...TYPOGRAPHY.h1,
-    color: COLORS.text,
-  },
-  avatarContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    ...SHADOW.medium,
-  },
-  avatarGradient: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropdownContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 100 : 80,
-    right: SPACING.l,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.m,
-    padding: SPACING.m,
-    zIndex: 1000,
-    ...SHADOW.large,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.s,
-  },
-  dropdownText: {
-    ...TYPOGRAPHY.body,
-    marginLeft: SPACING.s,
-    color: COLORS.danger,
-    fontWeight: 'bold',
-  },
-  pointsCard: {
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    position: 'relative',
-    overflow: 'hidden',
-    ...SHADOW.large,
-    marginBottom: SPACING.xl,
-  },
-  bgIcon: {
-    position: 'absolute',
-    right: -20,
-    bottom: -20,
-  },
-  pointsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.m,
-  },
-  pointsLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 1,
-  },
-  pointsValue: {
-    fontSize: 42,
-    fontWeight: '800',
-    color: '#FFF',
-    letterSpacing: -1,
-  },
-  levelBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.round,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  levelBadgeText: {
-    color: '#FFF',
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  levelContainer: {
-    marginTop: SPACING.l,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    padding: SPACING.m,
-    borderRadius: RADIUS.l,
-  },
-  levelHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  levelTitle: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  progressPercent: {
-    color: '#FFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 4,
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#FFF',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
-    fontWeight: '600',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.m,
-    marginTop: SPACING.s,
-  },
-  sectionTitle: {
-    ...TYPOGRAPHY.h3,
-    color: COLORS.text,
-    fontWeight: '700',
-  },
-  seeAll: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.primary,
-    letterSpacing: 0.5,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.xl,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.l,
-    padding: SPACING.l,
-    marginHorizontal: 6,
-    ...SHADOW.medium,
-    alignItems: 'center',
-  },
-  iconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.s,
-  },
-  statValue: {
-    ...TYPOGRAPHY.h2,
-    color: COLORS.text,
-    fontSize: 22,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.textMuted,
-    letterSpacing: 0.5,
-  },
-  vouchersScroll: {
-    marginBottom: SPACING.xl,
-    paddingLeft: 2,
-    paddingBottom: 8,
-  },
-  voucherCard: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.l,
-    borderRadius: RADIUS.l,
-    marginRight: SPACING.m,
-    width: 220,
-    ...SHADOW.medium,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  voucherClaimed: {
-    backgroundColor: '#F8FAFC',
-    opacity: 0.8,
-  },
-  voucherTop: {
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  voucherBrand: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  voucherTitle: {
-    ...TYPOGRAPHY.body,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.m,
-  },
-  codeBadge: {
-    backgroundColor: '#F1F5F9',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: RADIUS.s,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  codeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  badgesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: COLORS.surface,
-    padding: SPACING.l,
-    borderRadius: RADIUS.xl,
-    ...SHADOW.medium,
-  },
-  badgeWrapper: {
-    alignItems: 'center',
-  },
-  badgeIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  badgeLocked: {
-    opacity: 0.3,
-    backgroundColor: '#F1F5F9',
-  },
-  badgeEmoji: {
-    fontSize: 32,
-  },
-  lockOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#64748B',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFF',
-  },
-  badgeLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  badgePointsReq: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: COLORS.primary,
-    marginTop: 2,
-  },
-  badgeCountBadge: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.round,
-  },
-  badgeCountText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.primary,
-  },
-  textMuted: {
-    color: COLORS.textMuted,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scrollView: { flex: 1, width: CONTENT_WIDTH, alignSelf: 'center' },
+  scrollContent: { padding: SPACING.l, paddingBottom: 120 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Platform.OS === 'ios' ? 40 : 20, marginBottom: SPACING.l },
+  greeting: { fontSize: 13, color: COLORS.slateMuted, fontWeight: '600' },
+  title: { ...TYPOGRAPHY.h1, color: COLORS.slate },
+  avatarContainer: { width: 44, height: 44, borderRadius: 22, ...SHADOW.medium },
+  avatarGradient: { width: '100%', height: '100%', borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  dropdownContainer: { position: 'absolute', top: 100, right: 20, backgroundColor: '#FFF', borderRadius: 12, padding: 12, zIndex: 10, ...SHADOW.large },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center' },
+  dropdownText: { marginLeft: 10, fontWeight: 'bold', color: COLORS.danger },
+  impactHero: { padding: 24, borderRadius: RADIUS.xl, marginBottom: 24, ...SHADOW.large },
+  heroRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  heroLabel: { fontSize: 10, fontWeight: '900', color: 'rgba(255,255,255,0.7)', letterSpacing: 1 },
+  heroPoints: { fontSize: 36, fontWeight: '900', color: '#FFF' },
+  levelPill: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 },
+  levelPillText: { fontSize: 10, fontWeight: '900', color: '#FFF' },
+  progressSection: { marginTop: 20 },
+  progressBarBg: { height: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 3, overflow: 'hidden', marginBottom: 8 },
+  progressBarFill: { height: '100%', backgroundColor: '#FFF', borderRadius: 3 },
+  heroSubText: { fontSize: 13, color: '#FFF', fontWeight: '800' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 8 },
+  sectionTitle: { ...TYPOGRAPHY.h3, color: COLORS.slate },
+  seeAll: { fontSize: 10, fontWeight: '900', color: COLORS.primary, letterSpacing: 1 },
+  chartContainer: { backgroundColor: '#FFF', padding: 20, borderRadius: RADIUS.l, marginBottom: 16, ...SHADOW.medium },
+  chartTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  chartTitle: { fontSize: 10, fontWeight: '900', color: COLORS.slateMuted, letterSpacing: 0.5 },
+  legend: { flexDirection: 'row', alignItems: 'center' },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 4, marginLeft: 12 },
+  legendText: { fontSize: 10, fontWeight: '800', color: COLORS.slateMuted },
+  barsArea: { height: 120, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end' },
+  barColumn: { alignItems: 'center', flex: 1 },
+  barStack: { width: 12, height: '100%', backgroundColor: '#F1F5F9', borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden' },
+  barPart: { width: '100%', borderRadius: 6 },
+  barLabel: { marginTop: 8, fontSize: 10, fontWeight: '800', color: COLORS.slateMuted },
+  simCard: { backgroundColor: '#FFF', padding: 20, borderRadius: RADIUS.l, marginBottom: 20, ...SHADOW.medium },
+  simHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  simTitle: { fontSize: 11, fontWeight: '900', color: COLORS.primary, marginLeft: 8 },
+  simDesc: { fontSize: 14, fontWeight: '700', color: COLORS.slate, marginBottom: 20 },
+  sliderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sliderLabel: { fontSize: 12, fontWeight: '600', color: COLORS.slateMuted },
+  sliderControls: { flexDirection: 'row', alignItems: 'center' },
+  circleBtn: { width: 32, height: 32, borderRadius: 16, borderWeight: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  simResult: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 16, borderRadius: 12, marginTop: 8 },
+  simResultItem: { flex: 1, alignItems: 'center' },
+  simResultValue: { fontSize: 16, fontWeight: '900', color: COLORS.slate },
+  simResultLabel: { fontSize: 9, fontWeight: '800', color: COLORS.slateMuted, marginTop: 4 },
+  simResultDivider: { width: 1, height: 30, backgroundColor: '#E2E8F0' },
+  statsGrid: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  statBox: { flex: 1, backgroundColor: '#FFF', padding: 16, borderRadius: 12, ...SHADOW.small },
+  statLabel: { fontSize: 9, fontWeight: '900', color: COLORS.slateMuted, marginBottom: 4 },
+  statValue: { fontSize: 18, fontWeight: '900', color: COLORS.slate },
+  ledgerArea: { backgroundColor: '#FFF', borderRadius: RADIUS.l, padding: 12, ...SHADOW.small, marginBottom: 24 },
+  ledgerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  ledgerDate: { width: 45, alignItems: 'center' },
+  dayText: { fontSize: 16, fontWeight: '900', color: COLORS.slate },
+  monthText: { fontSize: 9, fontWeight: '800', color: COLORS.primary },
+  ledgerInfo: { flex: 1, marginLeft: 12 },
+  ledgerTitle: { fontSize: 13, fontWeight: '700', color: COLORS.slate },
+  ledgerSub: { fontSize: 11, color: COLORS.slateMuted, marginTop: 2 },
+  ledgerImpact: { alignItems: 'flex-end' },
+  impactText: { fontSize: 12, fontWeight: '900', color: '#059669' },
+  vouchersScroll: { paddingBottom: 10 },
+  voucherCard: { backgroundColor: '#FFF', padding: 16, borderRadius: 16, marginRight: 12, width: 200, ...SHADOW.small, borderLeftWidth: 4, borderLeftColor: COLORS.primary },
+  voucherBrand: { fontSize: 10, fontWeight: '900', marginBottom: 4 },
+  voucherTitle: { fontSize: 13, fontWeight: '700', color: COLORS.slate, marginBottom: 12 },
+  voucherFooter: { backgroundColor: '#F8FAFC', padding: 6, borderRadius: 4 },
+  voucherLabel: { fontSize: 9, fontWeight: '800', color: COLORS.slateMuted },
+  emptyText: { textAlign: 'center', padding: 20, color: COLORS.slateMuted, fontStyle: 'italic' },
 });

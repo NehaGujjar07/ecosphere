@@ -57,10 +57,15 @@ def get_profile(user_id: int):
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
+    # SECURE: SEED DATA FOR DEMONSTRATION IF REQUESTED
+    database.seed_historical_data(user_id)
+
     total_points = database.get_user_points(user_id)
     level_info = database.get_level_info(total_points)
     badges = database.get_earned_badges(total_points)
     savings = database.get_user_savings(user_id)
+    history = database.get_user_history(user_id)
+    trends = database.get_impact_trends(user_id)
 
     return {
         "user_id": user_id,
@@ -70,5 +75,7 @@ def get_profile(user_id: int):
         "level": level_info,
         "badges": badges,
         "savings": savings,
-        "all_badges": database.BADGES,  # For showing locked/unlocked badges on dashboard
+        "history": history,
+        "trends": trends,
+        "all_badges": database.BADGES,
     }

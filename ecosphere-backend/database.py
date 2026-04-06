@@ -112,3 +112,68 @@ def get_user_savings(user_id: int) -> dict:
         "co2_saved": round(row["total_co2"], 2),
         "waste_avoided": round(row["total_waste"], 2)
     }
+
+def get_user_history(user_id: int) -> list:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT *, purchased_at as date 
+        FROM purchases 
+        WHERE user_id = ? 
+        ORDER BY purchased_at DESC 
+        LIMIT 10
+    """, (user_id,))
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return rows
+
+def get_impact_trends(user_id: int) -> list:
+    """Groups savings by month for the last 6 months."""
+    conn = get_connection()
+    cur = conn.cursor()
+    # SQLite grouping by month
+    cur.execute("""
+        SELECT 
+            strftime('%m', purchased_at) as month,
+            SUM(co2_saved) as co2,
+            SUM(waste_avoided) as waste
+        FROM purchases
+        WHERE user_id = ?
+        GROUP BY month
+        ORDER BY month ASC
+        LIMIT 6
+    """, (user_id,))
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+    return rows
+
+def seed_historical_data(user_id: int):
+    """Seed the database with 6 months of mock sustainability wins for demonstration."""
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    # Only seed if they have very few purchases
+    cur.execute("SELECT COUNT(*) FROM purchases WHERE user_id = ?", (user_id,))
+    if cur.fetchone()[0] > 5:
+        conn.close()
+        return
+
+    import random
+    from datetime import datetime, timedelta
+
+    months = ["11", "12", "01", "02", "03", "04"]
+    for i, month in enumerate(months):
+        # Generate 2-3 purchases per month
+        for _ in range(random.randint(2, 4)):
+            # Distribute dates realistically
+            day = random.randint(1, 28)
+            date_str = f"2025-{month}-{day:02d} 10:00:00" if i < 2 else f"2026-{month}-{day:02d} 10:00:00"
+            
+            cur.execute("""
+                INSERT INTO purchases (user_id, items_count, points_awarded, co2_saved, waste_avoided, purchased_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, random.randint(1, 4), random.randint(20, 100), 
+                  random.uniform(0.5, 3.5), random.uniform(0.2, 1.2), date_str))
+    
+    conn.commit()
+    conn.close()
